@@ -36,6 +36,8 @@
   template:
     src: templates/slurmdbd.conf.j2
     dest: /etc/slurm/slurmdbd.conf
+    owner: "{{ slurm_system_user }}"
+    group: "{{ slurm_system_user }}"
     mode: 0600
     backup: yes
 
