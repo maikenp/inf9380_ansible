@@ -3,10 +3,11 @@
 ## install_slurm.yml
 
 
-
 ### Prerequisites: 
 
 Assumes RHEL7/8 compatible system.
+
+Firewall rules are handled in the openstack security groups. We have already defined those for you in NREC openstack. And you can see them added to your instances in the terraform definition file.
 
 
 #### Master node:
@@ -55,7 +56,7 @@ Obviously change the hostnames and ip-adresses according to your cluster.
 
 
 
-#### 2) Edit the default variables in the playbook:
+#### 2) Check the variables in group_vars/all to make sure they are the default you want
 
 
 Especially these variables need editing
@@ -65,15 +66,12 @@ Especially these variables need editing
   
 - SLURM_ACCOUNTING_DB_PASS
 
-  - mariadb password
+- mariadb password
+
 - slurm_submitters 
 
-   - if slurmdbd is set up, give a list of users that are allowed to submit to slurm. In the example defaults/main.yml only one submitter is added, just add another item in the list if needed
+   - if slurmdbd is set up, give a list of users that are allowed to submit to slurm. 
 
-- install_local
-  - Install using pre-built local rpms or using the EPEL repo.
-  - Allowed values are yes or no
-  
 - os_v
   - OS version
   - Allowed values are el7 or el8
@@ -86,44 +84,29 @@ Especially these variables need editing
 
 
 
-
 ### Running the playbook
-Ansible just uses ssh to connect to the remote servers. If your method to connect to the remote server is via password and normal user, and that you need to enter sudo password for privelege escalation, then run ansible in the following way:
-
+Ansible just uses ssh to connect to the remote servers.
 Run the commands below in the same directory as the playbook file for simplicity. 
 
 ```
-ansible-playbook -i <path-to-your-ansible-inventory-file> install_slurm.yml  --ask-pass --ask-become-pass
+ansible-playbook -i <path-to-your-ansible-inventory-file> install_slurm.yml 
 ```
 
 For example:
 
 ````
-ansible-playbook -i /etc/ansible/hosts install_slurm.yml --ask-pass --ask-become-pass
+ansible-playbook -i ansible_hosts install_slurm.yml --ask-pass --ask-become-pass
 ````
 
 This will install, configure and start slurmctld, slurmdbd and mariadb on the master and slurmd on the compute-nodes. 
-In addition it will install a healthcheck script which is not customized for general use. 
-Either customize it in ./roles/slurm_compute/files/node_healthcheck or skip it. 
 
-For installation without accounting, no slurmdbd nor mariadb is needed. Here also skippint the healthcheck and jobplugin task
+
+For installation without accounting, no slurmdbd nor mariadb is needed. 
 
 ```
-ansible-playbook -i /etc/ansible/hosts install_slurm.yml --ask-pass --ask-become-pass --skip-tags "db,healthcheck,jobplugin"
+ansible-playbook -i /etc/ansible/hosts install_slurm.yml  --skip-tags "db"
 ```
 
-If you. need to run the tasks for master and compute separately - for instance needed if one machine is NREC with ssh keys and passwordless sudo acces
-but the other is a uio machine with user-name password and not passwordless sudo access you will run the playbook twice, here shown with compute as needing password and master not
-
-To run
-
-     ansible-playbook -i /etc/ansible/hosts -l compute install_slurm.yml  --skip-tags "db,healthcheck,jobplugin"  --ask-pass --ask-become 
-     ansible-playbook -i /etc/ansible/hosts -l master install_slurm.yml --skip-tags "db,healthcheck,jobplugin"
-
-
-#### ssh stuff
-Otherwise, you can set up the remote host to allow logging in without password by injecting your public key into the remote host authorized_keys file. 
-Details are left for you to find out via google and/or know-how of ssh. (E.g. here: https://code-maven.com/enable-ansible-passwordless-sudo) 
 
 
 ### Testing the slurm installation
@@ -200,7 +183,6 @@ If slurmdbd is to be installed: slurmdbd, mariadb installation and configuration
 
 ### Build slurm and munge rpms
 https://slurm.schedmd.com/quickstart_admin.html
-
 
     dnf install epel-release -y
     dnf --enablerepo=powertools install wget rpm-build bzip2-devel openssl-devel zlib-devel gcc readline-devel pam-devel perl-ExtUtils-MakeMaker perl-DBI mysql-devel make munge-devel python3 lua-devel -y  

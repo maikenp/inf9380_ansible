@@ -72,23 +72,6 @@ JobAcctGatherType=jobacct_gather/linux
 JobAcctGatherFrequency=30
 {% endif %}
 
-{% if 'healthcheck' in ansible_skip_tags %}
-{% else %}
-##############################
-# HEALTHCECK
-##############################
-HealthCheckInterval=300
-HealthCheckProgram=/usr/local/sbin/node_healthcheck
-{% endif %}
-
-
-{% if 'jobplugin' in ansible_skip_tags %}
-{% else %}
-##############################
-#JOB SUBMIT PLUGIN
-##############################
-JobSubmitPlugins=lua
-{% endif %}
 
 ##############################
 # COMPUTE NODES

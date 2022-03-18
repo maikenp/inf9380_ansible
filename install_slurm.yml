@@ -1,13 +1,6 @@
 ---
 ######
-## This playbook runs the compute and master slurm setup separately
-## Typically  needed if one machine is NREC with ssh keys and passwordless sudo acces
-## but the other is a uio machine with  user-name password and not passwordless sudo access
-## you will run the playbook twice, here shown with compute as needing password and master not
-##
-## ansible-playbook -i /etc/ansible/hosts_hepp -l compute  install_slurm.yml --skip-tags db  --ask-pass --ask-become 
-## ansible-playbook -i /etc/ansible/hosts_hepp_master -l master install_slurm.yml 
-##
+## This playbook runs the compute and master slurm setup 
 ######
 
 
