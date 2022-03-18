@@ -1,0 +1,94 @@
+---
+
+- name: Create `munge` system linux group
+  group:
+    name: "{{ munge_system_user.group}}"
+    gid: "{{ munge_system_user.gid }}"
+    system: yes
+    state: present
+
+- name: Create `munge` system linux user
+  user:
+    name: "{{ munge_system_user.user }}"
+    group: "{{ munge_system_user.group}}"
+    uid: "{{ munge_system_user.uid }}"
+    system: yes
+    state: present
+
+- name: Create munge dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ munge_system_user.user}}"
+    group: "{{ munge_system_user.group}}"
+  with_items:
+    - /etc/munge
+    - /var/log/munge
+    - /var/run/munge
+    - /var/lib/munge
+
+
+- name: Copy the pre-built local rpm files
+  copy:
+      src: "files/slurmrpms/{{item}}"
+      dest: /tmp/
+  with_items:
+    - "munge-{{ munge_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "munge-libs-{{ munge_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "munge-devel-{{ munge_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+
+
+- name: Install munge from pre-built local rpm files
+  yum:
+     name: "{{ packages }}"
+     state: present
+     disable_gpg_check: yes
+  vars:
+    packages:
+    - "/tmp/munge-{{ munge_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/munge-libs-{{ munge_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/munge-devel-{{ munge_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+
+
+- name: Install munge
+  yum:
+   name: [munge, munge-libs, munge-devel]
+   state: present
+  when: install_local == "no"
+
+- name: Create munge key on master node 
+  shell: |
+      dd if=/dev/urandom bs=1 count=1024 > /etc/munge/munge.key
+  when: inventory_hostname in groups['master']
+
+- name: Try to copy the munge key from master to this machine running the ansible script
+  fetch: 
+    src: /etc/munge/munge.key
+    dest: /tmp/munge.key
+    flat: yes
+  when: inventory_hostname in groups['master']
+  ignore_errors: yes
+
+- name: Now try to copy the munge key to the compute nodes
+  copy: 
+    src: /tmp/munge.key
+    dest: /etc/munge/munge.key
+  when: inventory_hostname in groups['compute']
+  ignore_errors: yes
+
+- name: Set correct permissions on munge.key
+  file: 
+    path: /etc/munge/munge.key
+    mode: 0400
+    owner: "{{ munge_system_user.user}}"
+    group: "{{ munge_system_user.group}}"
+
+- name: Ensure the MUNGE service is running
+  systemd:
+    name: munge
+    enabled: yes
+    state: restarted
+
+...

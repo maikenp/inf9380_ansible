@@ -1,0 +1,66 @@
+---
+
+
+######################## 
+### slurm master
+######################## 
+
+- name: Install slurm db
+  include: db.yml
+  tags: db
+  when: (inventory_hostname in groups['master']) and ("db" not in ansible_skip_tags)
+
+
+- name: Install slurmdbd
+  include: slurmdbd.yml
+  tags: db
+  when: (inventory_hostname in groups['master']) and ("db" not in ansible_skip_tags)
+
+
+- name: Install slurmctld
+  include: slurmctld.yml
+  when: (inventory_hostname in groups['master'])
+
+
+- name: Create cluster in accounting database
+  tags:
+    - db
+  shell: |
+    sacctmgr --parsable --noheader list cluster | grep '^{{ slurm_cluster_name }}|' \
+      || sacctmgr -i -Q add cluster '{{ slurm_cluster_name }}'
+  when: (inventory_hostname in groups['master']) and ("db" not in ansible_skip_tags)
+
+
+## Each user gets an account with the same username
+- name: Create account(s) for cluster
+  tags:
+    - db
+  shell: |
+    sacctmgr --immediate --parsable --noheader list account Cluster='{{ slurm_cluster_name }}'  | grep '^{{ item.user }}|' \
+      || sacctmgr -i --quiet add account '{{ item.user }}' Cluster='{{ slurm_cluster_name }}'
+  with_items: '{{ slurm_submitters }}'
+  when: (inventory_hostname in groups['master']) and ("db" not in ansible_skip_tags)
+
+
+- name: Add Slurm user(s) to its default account (with same name as user-name)
+  tags: 
+    - db
+  shell: |
+    sacctmgr --immediate --parsable --noheader list user Account='{{ item.user }}' | grep '^{{item.user}}|' \
+      || sacctmgr --immediate --quiet add user '{{item.user}}' DefaultAccount='{{ item.user }}'
+  with_items: '{{ slurm_submitters }}'
+  when: (inventory_hostname in groups['master']) and ("db" not in ansible_skip_tags)
+
+
+#- name: Add slurm system user to the root account 
+
+- name: Ensure `slurmctld` is running
+  service:
+    name: slurmctld
+    enabled: yes
+    state: started
+  when: (inventory_hostname in groups['master'])
+
+
+
+... 

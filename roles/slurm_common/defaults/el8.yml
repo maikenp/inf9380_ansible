@@ -1,0 +1,4 @@
+slurm_db_server_name: MariaDB
+slurm_db_server_pkg: mariadb-server
+slurm_db_python_pkg: python3-mysql
+slurm_db_service_name: mariadb

@@ -1,0 +1,129 @@
+---
+
+- name: Install epel-release
+  yum: 
+    name: epel-release
+    state: present
+
+- name: Install and set up munge
+  include: munge.yml
+
+
+######################## 
+### slurm common
+######################## 
+
+- name: Create `slurm` submitter linux group if db is set up
+  tags: db
+  group:
+    name: "{{ item.group }}"
+    gid: "{{ item.gid }}"
+    system: yes
+    state: present
+  with_items: "{{ slurm_submitters }}"
+  when: ("db" not in ansible_skip_tags)
+  ignore_errors: yes
+
+- name: Create `slurm` submitter system linux user if db is set up
+  tags: db
+  user:
+    name: "{{ item.user }}"
+    group: "{{ item.group }}"
+    uid: "{{ item.uid }}"
+    system: yes
+    state: present
+  with_items: "{{ slurm_submitters }}"
+  when: ("db" not in ansible_skip_tags)
+  ignore_errors: yes
+
+
+- name: Create 'slurm' system linux group and user
+  block:
+    - name: Create 'slurm' system group
+      group:
+        name: "{{ slurm_system_user.group}}"
+        gid: "{{ slurm_system_user.gid }}"
+        system: yes
+        state: present
+    - name: Create `slurm` system linux user
+      user:
+        name: "{{ slurm_system_user.user }}"
+        group: "{{ slurm_system_user.group}}"
+        uid: "{{ slurm_system_user.uid }}"
+        system: yes
+        state: present
+  rescue:
+    - name: Error when creating slurm user or group in tasks executed previously
+      debug:
+         msg: "Seems like the slurm group and/or user already exists e.g. in ldap. Fatal error can be ignored."
+  ignore_errors: yes
+
+
+- name: Create slurm dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ slurm_system_user.user}}"
+    group: "{{ slurm_system_user.group}}"
+  with_items:
+    - /etc/slurm
+    - /var/log/slurm
+    - /var/lib/slurm
+    - /var/lib/slurm/checkpoint
+    - /var/lib/slurm/slurmd
+    - /var/lib/slurm/slurmctld
+    - /var/spool/slurm
+    
+
+- name: Copy the pre-built local rpm files
+  copy:
+      src: "files/slurmrpms/{{item}}"
+      dest: "/tmp/{{ item }}"
+  with_items:
+    - "slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "slurm-example-configs-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+  
+
+- name: Install from local rpms SLURM package
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_gpg_check: yes
+    disable_excludes: all
+  vars:
+    packages:
+    - "/tmp/slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/slurm-example-configs-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+
+
+- name: Install from epel slurm package
+  yum:
+    name: "{{ packages }}"
+    state: present 
+    disable_excludes: all
+  vars:
+    packages:
+      - slurm
+      - slurm-example-configs
+  when: install_local == "no"
+
+
+- name: Copy slurm.conf
+  template:
+    src: templates/slurm.conf.j2
+    dest: /etc/slurm/slurm.conf
+    mode: 0644
+    backup: yes
+
+
+- name: Copy slurmnodes.conf
+  template:
+    src: templates/slurmnodes.conf.j2
+    dest: /etc/slurm/slurmnodes.conf
+    mode: 0644
+    backup: yes
+  ignore_errors: yes
+
+... 

@@ -1,0 +1,59 @@
+
+master_name: "{{ groups['master'][0] }}"
+master_ip: "{{ hostvars[groups['master'][0]].ansible_host }}"
+
+
+
+
+###########################################
+## These variables must all be set by hand
+###########################################
+
+## no if munge and slurm can be installed from epel repo
+## yes if prebuilt local rpms are to be used
+install_local: "yes"
+
+
+os_v: "el8"
+
+slurm_v: "20.11.4"
+munge_v: "0.5.14"
+
+slurm_cluster_name: "robin"
+
+slurm_system_user: 
+   user: "slurm"
+   group: "slurm"
+   uid: 1103
+   gid: 1103
+
+
+munge_system_user: 
+   user: "munge"
+   group: "munge"
+   uid: 1104
+   gid: 1104
+
+
+
+
+##########################################################################
+## These variables need only be set if you are running the db.yml task
+##########################################################################
+
+
+SLURM_ACCOUNTING_HOST: "slurmdbd"
+SLURM_ACCOUNTING_DB_PASS: "eebieR2w"
+
+##if other than pre-existing users, also provide uid and gid
+##is multi-valued, add all the users you need
+slurm_submitters: 
+  - user: "centos" 
+    group: "centos"
+    uid: ""
+    gid: ""
+
+
+slurm_db_name: "{{slurm_system_user.user}}"
+
+

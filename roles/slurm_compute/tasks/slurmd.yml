@@ -1,0 +1,45 @@
+---
+- name: Copy the pre-built local rpm files
+  copy:
+      src: "files/slurmrpms/{{item}}"
+      dest: "/tmp/{{ item }}"
+  with_items:
+    - "slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "slurm-slurmd-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+  
+
+- name: Install from local rpms slurmd packages on compute-node
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_gpg_check: yes
+    disable_excludes: all
+  vars:
+    packages:
+    - mailx
+    - "/tmp/slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/slurm-slurmd-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+
+
+- name: Install from epel slurmd related packages on compute-nodes
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_excludes: all
+  vars:
+    packages:
+      - slurm
+      - slurmd
+  when: install_local == "no"
+
+
+- name: Enable and start slurmd on compute nodes
+  systemd:
+    name: slurmd
+    enabled: yes
+    state: restarted
+
+
+...

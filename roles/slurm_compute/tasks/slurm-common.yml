@@ -1,0 +1,57 @@
+---
+
+- name: Create 'slurm' system linux group and user
+  block:
+    - name: Create 'slurm' system group
+      group:
+        name: "{{ slurm_system_user.group}}"
+        gid: "{{ slurm_system_user.gid }}"
+        system: yes
+        state: present
+    - name: Create `slurm` system linux user
+      user:
+        name: "{{ slurm_system_user.user }}"
+        group: "{{ slurm_system_user.group}}"
+        uid: "{{ slurm_system_user.uid }}"
+        system: yes
+        state: present
+  rescue:
+    - name: Error when creating slurm user or group in tasks executed previously
+      debug:
+         msg: "Seems like the slurm group and/or user already exists e.g. in ldap. Fatal error can be ignored."
+  ignore_errors: yes
+
+- name: Create slurm dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ slurm_system_user.user}}"
+    group: "{{ slurm_system_user.group}}"
+  with_items:
+    - /etc/slurm
+    - /var/log/slurm
+    - /var/lib/slurm
+    - /var/lib/slurm/checkpoint
+    - /var/lib/slurm/slurmd
+    - /var/lib/slurm/slurmctld
+    - /var/spool/slurm
+
+
+    
+
+- name: Copy slurm.conf
+  template:
+    src: templates/slurm.conf.j2
+    dest: /etc/slurm/slurm.conf
+    backup: yes
+
+
+- name: Copy slurmnodes.conf
+  template:
+    src: templates/slurmnodes.conf.j2
+    dest: /etc/slurm/slurmnodes.conf
+    backup: yes
+  ignore_errors: yes
+
+
+...

@@ -1,0 +1,191 @@
+#!/bin/bash
+### /usr/local/sbin/node_healthcheck
+### Code lives in https://source.coderefinery.org/maikenp/maiken (should move to UiO BitBucket)
+###
+
+## Configuration                                                                                                                                                                                                     
+STATUS=/var/run/nodestatus
+LOG=/var/log/slurm/healthcheck.log
+NODE=$(hostname -s)
+
+exec >>/var/log/slurm/healthcheck.err 2>&1
+date
+date=$(date)
+
+##
+## 1) Checks if cvmfs is ok. If not, tries to wipe cache and restart autofs, and if that still does not fix cvmfs, put node in down. Then need manual invervention to fix.
+## 2) Checks space of /dev - if < 10kB - if it is, set node to drain. Then need manual invervention to fix.
+## 3) Checks space of /tmp - if < 5%  - if it is, set node to drain. Then need manual invervention to fix.
+## 4) If > 3 jobs on node get slurm timeout then drain. Then need manual invervention to fix. 
+
+
+
+## Drain the node with a reason and exit
+## Details: Exits, but doesn't drain if node was drained before with same reason
+drain() {
+   if ! fgrep -q "$2" $STATUS; then
+       echo -n "$2" > $STATUS
+       scontrol update nodename=$NODE state=drain reason="$2"
+       echo "[$date] Draining (duration $1): $2" >> $LOG
+   fi
+   exit 0
+}
+
+
+down() {
+   if ! fgrep -q "$2" $STATUS; then
+       echo -n "$2" > $STATUS
+       scontrol update nodename=$NODE state=down reason="$2"
+       echo "[$date] Draining (duration $1): $2" >> $LOG
+   fi
+}
+
+
+resume() {
+    if fgrep -q "$1" $STATUS; then
+    scontrol update nodename=$NODE state=resume reason="$2"
+    echo -n "[$date] all ok" > $STATUS
+    echo "[$date] Resuming $2" >> $LOG
+    fi
+}
+
+
+#########################################
+########### Failed jobs    ##############
+#########################################
+nfailed=$(sacct  --format=JobID,state,nodelist -N $NODE |  tail -n 10 | grep FAILED |wc -l)
+if (( $nfailed == 5 )); then 
+    drain temporary 'last 5 jobs failed'
+else
+    ncompl=$(sacct  --format=JobID,state,nodelist -N $NODE |  tail -n 10 | grep COMPLETED | wc -l)
+    if (( $ncompl > 0 )); then
+    #only resume if there were actually some jobs that have completed successfully 
+    resume 'last 5 jobs failed' 'jobs now ok'
+    fi
+fi
+
+  
+#################################
+########## Timeouts  ############
+#################################
+ntimeouts=$(sacct --format=state,nodelist -N $NODE  | tail -n 10 | grep TIMEOUT | wc -l)
+if (( $ntimeouts > 3 )); then 
+    drain temporary 'node gives > 3 timeout of jobs'
+else
+    ncompl=$(sacct  --format=JobID,state,nodelist -N $NODE | tail -n 10 | grep COMPLETED | wc -l)
+    if (( $ncompl > 0 )); then
+    #only resume if there were actually some jobs that have completed successfully 
+    resume 'node gives > 3 timeout of jobs' 'timeout ok'
+    fi
+fi
+
+
+#############################################
+########### Full /scratch-ssd  ##############
+#############################################
+avail=$(df -k /scratch-ssd | awk '/^\/dev/ {print $4}')
+if (( $avail < 10000 )); then
+    drain temporary '/scratch-ssd is full'
+else
+    resume  '/scratch-ssd is full' '/scratch-ssd is ok'
+fi
+
+
+####################################################
+########## Full /dev/sda1 (/tmp /var..) ############
+####################################################
+used=$(df /dev/sda1 | awk '/^\/dev/ {print $5}' | tr -d %)
+if (( $used > 95 )); then
+    drain temporary '/dev/sda1 is full'
+else
+    resume '/dev/sda1 is full' '/dev/sda1 is ok'
+fi
+
+
+
+###############################
+##########   /cvmfs  ##########
+###############################
+#echo -n ' /cvmfs'
+## Check if all is well with cvmfs
+## If not 
+### 1) clean cache, restart autofs, check cvmfs again
+### 2) if not ok after 1) set node down with reason and add entry in OPSLOG_nodes
+
+## cvmfs uses three repos
+repo[0]=atlas.cern.ch
+repo[1]=atlas-condb.cern.ch
+dir[0]=repo/sw
+dir[1]=repo/conditions
+
+
+node_fault=0
+
+set_node_down (){
+    
+    ## Try to kill all grid processes (killall exits 1 if no
+    ## processes were running, so we can't test for success):
+    killall -9 -u grid
+    killall -9 -u gridadm
+    killall -9 -u gridrep
+    killall -9 -u gridana
+    
+    ## Sleep a little to allow them to die properly
+    sleep 5
+
+    down "setting node to down - cvmfs not working" "cvmfs_down"
+    #scontrol update node=$node state=down reason="cvmfs not working"
+    #echo -n "cvmfs_down" > $STATUS
+    #echo "Set status cvmfs_down" >> $LOG
+
+}
+
+
+check_cvmfs_mountpoints (){
+    node_fault=0
+    for i in 0 1; do
+    #echo "[$date] /cvmfs/${repo[$i]}/${dir[$i]}" >> $LOG
+    ## Check to see if mount point for cvmfs is problematic
+    if ls -la /cvmfs/${repo[$i]}/${dir[$i]} 2>&1 | 
+        grep -q -e Transport -e "No such file or directory"; then
+            node_fault=1
+	            echo -e "[$date] \tnode fault is $node_fault\n" >> $LOG
+		    	 fi
+    done
+    return $node_fault
+}
+
+
+
+if [ ! -f $STATUS ]; then
+    ## This is the first run after a boot.  Touch the status file
+    touch $STATUS
+    echo -n "[$date] booted" > $STATUS
+fi
+
+
+##Check cvmfs twice, if not ok, set down
+check_cvmfs_mountpoints
+if [ $? -eq 1 ]; then 
+
+    #try wipe and restart autofs to fix cvmfs
+    cvmfs_config wipecache;
+    systemctl restart autofs;
+    sleep 5
+
+    #is it ok now?
+    check_cvmfs_mountpoints
+    if [ $? -eq 1 ]; then 
+    set_node_down
+    fi
+else
+    ## if node is good, but in last call of healthcheck was not, or nothing in status file, or booted in status file
+    stat=$(cat $STATUS)
+    if [ "$stat" == "cvmfs_down" ] || [ "$stat" == "booted" ]; then
+    resume $stat 'cvmfs_ok'
+    fi
+fi
+
+echo
+date
+

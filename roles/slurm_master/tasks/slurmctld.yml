@@ -1,0 +1,43 @@
+---
+
+- name: Copy the pre-built local rpm files
+  copy:
+      src: "files/slurmrpms/{{item}}"
+      dest: "/tmp/{{ item }}"
+  with_items:
+    - "slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "slurm-slurmctld-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "slurm-example-configs-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+  
+
+- name: Install from local rpms SLURMctld packages on master-node
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_gpg_check: yes
+    disable_excludes: all
+  vars:
+    packages:
+    - mailx
+    - "/tmp/slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/slurm-slurmctld-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/slurm-example-configs-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+
+
+- name: Install from epel slurmctdl related packages on master-node
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_excludes: all
+  vars:
+    packages:
+      - mailx
+      - slurm
+      - slurmctld
+      - slurm-example-configs
+  when: install_local == "no"
+
+
+...

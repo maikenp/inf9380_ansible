@@ -1,0 +1,118 @@
+---
+######
+## This playbook runs the compute and master slurm setup separately
+## Typically  needed if one machine is NREC with ssh keys and passwordless sudo acces
+## but the other is a uio machine with  user-name password and not passwordless sudo access
+## you will run the playbook twice, here shown with compute as needing password and master not
+##
+## ansible-playbook -i /etc/ansible/hosts_hepp -l compute  install_slurm.yml --skip-tags db  --ask-pass --ask-become 
+## ansible-playbook -i /etc/ansible/hosts_hepp_master -l master install_slurm.yml 
+##
+######
+
+
+- hosts: master:compute
+  gather_facts: yes
+  become: yes
+
+  vars:
+    master_name: "{{ groups['master'][0] }}"
+    master_ip: "{{ hostvars[groups['master'][0]].ansible_host }}"
+    install_local: "yes"
+
+    os_v: "el8"
+    slurm_v: "20.11.4"
+    munge_v: "0.5.14"
+
+    slurm_cluster_name: "zpath"
+
+    slurm_system_user: 
+       user: "slurm"
+       group: "slurm"
+       uid: 150404
+       gid: 259076
+
+    munge_system_user: 
+       user: "munge"
+       group: "munge"
+       uid: 1104
+       gid: 1104
+
+
+    slurm_submitters: 
+      - user: "galaxy" 
+        group: "galaxy"
+        uid: 182649
+        gid: 70731
+
+    slurm_db_name: "{{slurm_system_user.user}}"
+    
+    slurmctldport: "6817"
+
+  roles:
+    - slurm_common
+  
+
+- hosts: master
+  gather_facts: yes
+  become: yes
+
+
+  vars:
+    master_name: "{{ groups['master'][0] }}"
+    master_ip: "{{ hostvars[groups['master'][0]].ansible_host }}"
+    install_local: "yes"
+
+    os_v: "el8"
+    slurm_v: "20.11.4"
+    munge_v: "0.5.14"
+
+    slurm_cluster_name: "zpath"
+
+    slurm_system_user: 
+       user: "slurm"
+       group: "slurm"
+       uid: 150404
+       gid: 259076
+
+    munge_system_user: 
+       user: "munge"
+       group: "munge"
+       uid: 1104
+       gid: 1104
+
+
+    slurm_submitters: 
+      - user: "galaxy" 
+        group: "galaxy"
+        uid: ""
+        gid: ""
+
+
+    SLURM_ACCOUNTING_HOST: ""
+    SLURM_ACCOUNTING_DB_PASS: ""
+    slurm_db_name: ""
+
+
+  roles:
+    - slurm_master
+
+
+
+- hosts: compute
+  gather_facts: yes
+  become: yes
+
+
+  vars:
+    master_name: "{{ groups['master'][0] }}"
+    master_ip: "{{ hostvars[groups['master'][0]].ansible_host }}"
+    install_local: "yes"
+
+    os_v: "el8"
+    slurm_v: "20.11.4"
+    munge_v: "0.5.14"
+
+  roles:
+    - slurm_compute
+

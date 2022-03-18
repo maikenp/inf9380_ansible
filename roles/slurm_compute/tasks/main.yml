@@ -1,0 +1,25 @@
+---
+
+
+######################## 
+### slurm worker
+######################## 
+
+- name: Install slurmd on worker nodes
+  include: slurmd.yml
+  when: (inventory_hostname in groups['compute'])
+
+
+################################
+### slurm node_healthcheck file
+################################
+
+- name: Place node_healthcheck on worker nodes
+  tags: healthcheck
+  copy:
+    src: files/node_healthcheck
+    dest: /usr/local/sbin/node_healthcheck
+  when: "'healthcheck' not in ansible_skip_tags"
+
+
+... 

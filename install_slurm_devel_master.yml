@@ -1,0 +1,27 @@
+---
+######
+## This playbook runs simply the slurm-devel installation on the master slurm host
+##
+## ansible-playbook -i /etc/ansible/hosts_hepp_master  install_slurm_devel_master.yml 
+##
+######
+
+- hosts: master
+  gather_facts: yes
+  become: yes
+
+
+  vars:
+    master_name: "{{ groups['master'][0] }}"
+    master_ip: "{{ hostvars[groups['master'][0]].ansible_host }}"
+    install_local: "yes"
+
+    os_v: "el8"
+    slurm_v: "20.11.4"
+    munge_v: "0.5.14"
+
+
+  tasks:
+    - include: roles/slurm_master/tasks/slurmdevel.yml
+
+

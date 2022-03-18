@@ -1,0 +1,16 @@
+# THIS FILE IS CONTROLLED BY ANSIBLE
+# local modifications will be overwritten
+# the next time ansible is run!
+#
+
+{% for host in vars['play_hosts'] %}
+
+{% if host in groups.compute %}
+NodeName={{host}} RealMemory={{hostvars[host].ansible_memtotal_mb|int - 384}} CPUs={{hostvars[host].ansible_processor_vcpus}} {% if hostvars[host].gpu_count_total|default(0) > 0 %}{% for model in hostvars[host].gpu_count %} Gres=gpu:{{model}}:{{hostvars[host].gpu_count[model]}}{% endfor %}{% endif %}
+
+{% endif %}
+{% endfor %}
+
+PartitionName=main Nodes={% for host in groups.compute %}{{host}},{%endfor%} MaxTime=INFINITE State=UP Default=YES
+
+

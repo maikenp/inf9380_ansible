@@ -1,0 +1,51 @@
+---
+
+- name: Copy the pre-built local rpm files
+  copy:
+      src: "files/slurmrpms/{{item}}"
+      dest: "/tmp/{{ item }}"
+  with_items:
+    - "slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "slurm-slurmdbd-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+  
+
+- name: Install from local rpms SLURMctld packages on master-node
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_gpg_check: yes
+    disable_excludes: all
+  vars:
+    packages:
+    - mailx
+    - "/tmp/slurm-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+    - "/tmp/slurm-slurmdbd-{{ slurm_v }}-1.{{ os_v }}.x86_64.rpm"
+  when: install_local == "yes"
+
+
+
+- name: Install epel SLURMdbd  package on master-node
+  yum:
+    name: slurm-slurmdbd
+    disable_excludes: all
+  when: install_local == "no"
+
+
+- name: Copy slurmdbd.conf
+  template:
+    src: templates/slurmdbd.conf.j2
+    dest: /etc/slurm/slurmdbd.conf
+    mode: 0600
+    backup: yes
+
+
+- name: Enable and start slurmdbd on master node
+  systemd:
+    name: slurmdbd
+    enabled: yes
+    state: restarted
+  when: inventory_hostname in groups['master']
+
+
+...

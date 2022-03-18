@@ -1,0 +1,69 @@
+
+---
+- name: Include variables
+  include_vars: "defaults/{{os_v}}.yml"
+
+  
+- name: "Install {{ slurm_db_server_name }}, used for SLURM accounting"
+  package:
+    name:
+      - "{{ slurm_db_server_pkg }}"
+      - "{{ slurm_db_python_pkg }}"
+    state: present
+
+
+##innod change recommendation from here: 
+##https://wiki.fysik.dtu.dk/niflheim/Slurm_database#mysql-configuration
+
+- name: "Change innod settings for {{ slurm_db_server_name }}"
+  copy:
+    src: files/innodb.cnf
+    dest: /etc/my.cnf.d/innodb.cnf
+
+- name: Check if /var/lib/mysql/ib_logfile exist 
+  stat: 
+    path: /var/lib/mysql/ib_logfile0
+  register: ib_logfile
+
+
+- name: If ib_logfiles exists, stop db service to prepare for removing files
+  systemd:
+    name: "{{ slurm_db_service_name }}"
+    state: stopped
+  when: ib_logfile.stat.exists == True
+
+
+- name: If ib_logfiles existed, move old log-files
+  shell: mv /var/lib/mysql/ib_logfile? /tmp
+  when: ib_logfile.stat.exists == True
+
+
+- name: "Ensure {{ slurm_db_server_name }} daemon is up"
+  service:
+    name: "{{slurm_db_service_name }}"
+    enabled: yes
+    state: started
+
+
+
+- name: Create DB for SLURMDBD
+  mysql_db:
+    name: "{{ slurm_db_name }}"
+    state: present
+
+
+- name: Create mysqlDB user for SLURMDBD
+  mysql_user:
+    name: '{{ slurm_system_user.user }}'
+    host: '{{item}}'
+    password: '{{SLURM_ACCOUNTING_DB_PASS}}'
+    priv: '{{ slurm_system_user.user }}.*:ALL'
+    state: present
+  loop:
+    - '{{SLURM_ACCOUNTING_HOST}}'
+    - 'localhost'
+    - '{{ ansible_hostname }}'
+
+
+
+... 
