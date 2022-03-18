@@ -18,8 +18,6 @@
 
 
   tasks:
-    - include: roles/slurm_master/tasks/slurmdevel.yml
-
     - name: Add cluster-hostnames in hosts file
       blockinfile:
         path: /etc/hosts
@@ -28,11 +26,12 @@
           {% for server in groups['all'] %}
              {{ hostvars[server].ansible_host }} {{server }}
           {% endfor %}
+          
+   - include_role: 
+       name: slurm_master
 
-  roles:
-    - slurm_master
+    - include: roles/slurm_master/tasks/slurmdevel.yml
 
-  
 
 - hosts: compute
   gather_facts: yes
