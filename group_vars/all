@@ -1,0 +1,35 @@
+master_name: "{{ groups['master'][0] }}"
+master_ip: "{{ hostvars[groups['master'][0]].ansible_host }}"
+install_local: "yes"
+
+os_v: "el8"
+slurm_v: "20.11.4"
+munge_v: "0.5.14"
+
+slurm_cluster_name: "inf9380"
+
+slurm_system_user: 
+   user: "slurm"
+   group: "slurm"
+   uid: 1001
+   gid: 1001
+
+munge_system_user: 
+   user: "munge"
+   group: "munge"
+   uid: 1002
+   gid: 1002
+
+
+slurm_submitters: 
+   - user: "centos" 
+     group: "centos"
+     uid: 1000
+     gid: 1000
+
+slurm_db_name: "{{slurm_system_user.user}}"
+slurmctldport: "6817"
+
+SLURM_ACCOUNTING_HOST: "slurmdbd"
+SLURM_ACCOUNTING_DB_PASS: "someVeryhardpwd/indeed_?"
+slurm_db_name: "{{ slurm_system_user.user }}"
